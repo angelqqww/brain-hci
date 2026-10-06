@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera Test</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; background: #111; color: #eee; }
+  video { width: min(640px, 90vw); height: auto; background: #000; border-radius: 6px; display: block; }
+  #status { font-size: 1.05rem; }
+  .ok { color: #5fe0c0; }
+  .err { color: #ff7a8a; }
+  label, select { font-size: 1rem; }
+</style>
+</head>
+<body>
+  <h1>Camera test</h1>
+  <p id="status" role="status" aria-live="polite">Requesting camera access...</p>
+  <p>
+    <label for="cams">Camera:</label>
+    <select id="cams" disabled></select>
+  </p>
+
+  <video id="video" autoplay playsinline muted aria-label="Live camera feed"></video>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const video = document.getElementById('video');
+    const select = document.getElementById('cams');
+
+    let stream = null;   // current camera stream
+
+    function setStatus(msg, cls) {
+      statusEl.textContent = msg;
+      statusEl.className = cls || '';
+    }
+
+    // Friendly explanations for common camera errors
+    const HINTS = {
+      NotAllowedError: 'Permission denied. Allow camera access in the browser, and check System Settings → Privacy & Security → Camera.',
+      NotFoundError: 'No camera found.',
+      NotReadableError: 'The camera is busy. Close other apps using it (FaceTime, Zoom, Photo Booth) and reload.',
+      OverconstrainedError: 'That camera is unavailable. Pick another one from the list.'
+    };
+
+    async function startCamera(deviceId) {
+      // Stop the previous camera before switching
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false
+      };
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        setStatus('Camera error: ' + (HINTS[err.name] || err.message), 'err');
+        return;
+      }
+
+      video.srcObject = stream;
+      await video.play();
+
+      const track = stream.getVideoTracks()[0];
+      const s = track.getSettings();
+      setStatus(`Camera working: ${track.label} (${s.width}×${s.height})`, 'ok');
+
+      await listCameras(s.deviceId);
+    }
+
+    // Camera names are only visible after permission is granted, so list them afterwards
+    async function listCameras(currentId) {
+      const devices = (await navigator.mediaDevices.enumerateDevices())
+        .filter((d) => d.kind === 'videoinput');
+      select.innerHTML = '';
+      devices.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Camera ${i + 1}`;
+        opt.selected = d.deviceId === currentId;
+        select.appendChild(opt);
+      });
+      select.disabled = devices.length < 2;
+    }
+
+    select.addEventListener('change', () => startCamera(select.value));
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Camera access is blocked on this page. Open it through http://localhost, not as a file.', 'err');
+    } else {
+      startCamera();
+    }
+  </script>
+</body>
+</html>
