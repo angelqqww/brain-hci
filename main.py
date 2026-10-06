@@ -16,7 +16,7 @@ import threading
 import urllib.parse
 import webbrowser
 
-PAGE = "Angela Wang.html"   # the page to open
+PAGE = "index.html"         # the page to open
 HOST = "127.0.0.1"          # only this computer can reach the server
 PREFERRED_PORT = 8000
 

@@ -23,3 +23,45 @@ A few things make it so delightful:
 
 Want me to pull up a few videos or images of pandas sliding in snow?
 ###############################################
+Prompt to Claude Opus 5.5: 
+
+give this brain image, create another, more creative personal website with the contents from my personal website but exclude the design details: https://angelaxinwang.vercel.app/ 
+
+Design specifics:
+Theme: 
+
+* very minimal milky way background
+
+UI:
+
+* when user hovers over different regions of the brain, it lights up a different color and one of the following sections: projects & currently building..., research & programs, performance and recognition, for fun (these sections are on the vercel website)
+* once the user clicks, a pop up section appears with the information, formatted with the same inputs but design wise in a minimalistic way.
+
+Response: 
+
+Your new site is live above. Here's how it works:
+
+**Layout**
+- Sparse, slowly twinkling starfield with a faint diagonal Milky Way band
+- Your name, tagline, and LinkedIn sit quietly in the corner; the brain is the centerpiece
+
+**Brain regions (top → bottom)**
+- **Frontal / red-rose glow** → Projects & Currently building
+- **Middle / teal glow** → Research & Programs
+- **Lower-middle / violet glow** → Performance & Recognition
+- **Bottom / blue glow** → For Fun
+- Only the brain itself responds; hovering transparent space does nothing
+
+**Interaction**
+- Hover: region lights up in its color and the section name floats over it
+- Click: minimal popup opens with that section's tabs (e.g. Books / YouTube / Philosophy)
+- Close with ×, Escape, or clicking outside
+- Labeled buttons under the brain work for mobile taps and keyboard users
+
+**Content gaps to fill**
+- Your site only exposed the *first* tab of each section, so these currently show only their name:
+  - CALIMOD (iGEM Biotech)
+  - University of Vienna, Stanford Summer Anesthesia Institute, STEM Awards
+- Music tabs (Awards, Programs & Soloist, Orchestral, Recordings) were left out entirely; only Biography is included
+- Paste their details here and I'll add them in
+################

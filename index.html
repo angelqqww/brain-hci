@@ -47,6 +47,11 @@ a{color:inherit}
 .glow.on{opacity:1}
 .halo{position:absolute;inset:8%;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .5s,background .5s;filter:blur(60px);z-index:-1}
 .brainwrap.active .halo{opacity:.35}
+/* 3D brain: the canvas is a bit bigger than the box so rotated edges aren't cut off */
+.brainwrap canvas.brain3d{position:absolute;left:-12%;top:-12%;width:124%;height:124%;pointer-events:none}
+.brainwrap.is3d{touch-action:none}
+.brainwrap.is3d img,.brainwrap.is3d .glow{visibility:hidden}
+.brainwrap.is3d .label{transition:opacity .3s}
 
 .label{position:absolute;left:50%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;opacity:0;transition:opacity .3s,top .3s;white-space:nowrap}
 .label span{font-family:var(--serif);font-size:clamp(1.3rem,3vw,2.1rem);color:#fff;text-shadow:0 0 24px var(--c),0 2px 10px rgba(0,0,0,.9)}
@@ -99,6 +104,39 @@ ul.rows li span:first-child,.yb .y{font-family:var(--serif);font-size:1.05rem;co
 .yb ul.plain{margin-bottom:12px}
 @media (max-width:480px){ul.rows li,.yb{grid-template-columns:1fr;gap:2px}.yb .y{padding-top:10px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* hand control */
+.header-actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.hand-btn{background:none;border:1px solid var(--line);border-radius:999px;color:var(--muted);font:inherit;font-size:.85rem;padding:5px 14px;cursor:pointer;transition:color .2s,border-color .2s}
+.hand-btn:hover,.hand-btn:focus-visible,.hand-btn[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
+.hand-btn:disabled{opacity:.6;cursor:progress}
+.hand-status{font-size:.8rem;color:var(--muted)}
+/* troubleshooting tips, shown only while hand control is on */
+.help{position:relative}
+.help summary{list-style:none;cursor:pointer;color:var(--muted);font-size:.85rem;border:1px solid var(--line);border-radius:999px;padding:5px 14px;transition:color .2s,border-color .2s}
+.help summary::-webkit-details-marker{display:none}
+.help summary:hover,.help summary:focus-visible,.help[open] summary{color:var(--ink);border-color:var(--ink)}
+.help summary:focus-visible{outline:1px solid var(--ink);outline-offset:4px}
+.help-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:25;width:min(330px,calc(100vw - 32px));margin:0;padding:12px 16px;list-style:none;
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.help-panel li{font-size:.8rem;line-height:1.45;color:#d6d2e2;padding:6px 0;border-bottom:1px solid var(--line)}
+.help-panel li:last-child{border-bottom:0}
+.help-panel strong{font-weight:500;color:var(--ink)}
+.cam{position:fixed;right:16px;bottom:16px;z-index:20;width:min(200px,32vw);margin:0;display:none;pointer-events:none}
+.cam.on{display:block}
+/* mirrored like a selfie view, so the preview moves the same way as the cursor */
+.cam video{width:100%;display:block;border-radius:6px;border:1px solid var(--line);background:#000;transform:scaleX(-1)}
+/* lightbulb cursor: the point it clicks is the center of the glass (20px, 17px into the bulb) */
+.hand-cursor{position:fixed;left:0;top:0;z-index:30;width:40px;height:56px;margin:-17px 0 0 -20px;pointer-events:none;opacity:0;transition:opacity .2s}
+.hand-cursor svg{display:block;overflow:visible;filter:drop-shadow(0 0 6px rgba(255,255,255,.45)) drop-shadow(0 2px 4px rgba(0,0,0,.8));transition:filter .12s}
+.hand-cursor.on{opacity:1}
+.bulb-glass{fill:rgba(255,244,200,.12);stroke:#fff;stroke-width:2.2;stroke-linejoin:round;transition:fill .12s}
+.bulb-filament{fill:none;stroke:rgba(255,255,255,.7);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;transition:stroke .12s}
+.bulb-base{fill:#c9c6da}
+/* lights up while the right hand is pinching */
+.hand-cursor.pinch svg{filter:drop-shadow(0 0 10px #ffd85a) drop-shadow(0 0 26px rgba(255,200,60,.8))}
+.hand-cursor.pinch .bulb-glass{fill:#ffe680;stroke:#fff6c8}
+.hand-cursor.pinch .bulb-filament{stroke:#ff9d00}
 </style>
 </head>
 <body>
@@ -111,7 +149,21 @@ ul.rows li span:first-child,.yb .y{font-family:var(--serif);font-size:1.05rem;co
       <h1>Angela Wang</h1>
       <p class="tag">exploring minds, music, and everything in between</p>
     </div>
-    <a class="link" href="https://www.linkedin.com/in/angela-x-wang-bb0887262" target="_blank" rel="noopener">LinkedIn</a>
+    <div class="header-actions">
+      <span class="hand-status" id="handStatus" role="status" aria-live="polite"></span>
+      <details class="help" id="handHelp" hidden>
+        <summary>Troubleshoot</summary>
+        <ul class="help-panel">
+          <li><strong>Brain not turning smoothly?</strong> Keep your whole hand and wrist in frame.</li>
+          <li><strong>Turning won't start?</strong> Spread all five fingers, palm toward the camera.</li>
+          <li><strong>Cursor jumpy or lost?</strong> Add light and sit about an arm's length away.</li>
+          <li><strong>Pinch not clicking?</strong> Keep your right hand in view. The bulb glows on a pinch.</li>
+          <li><strong>Hands mixed up?</strong> Show both hands for a second.</li>
+        </ul>
+      </details>
+      <button class="hand-btn" id="handBtn" type="button" aria-pressed="false">Hand control</button>
+      <a class="link" href="https://www.linkedin.com/in/angela-x-wang-bb0887262" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
   </header>
 
   <section class="stage">
@@ -136,6 +188,17 @@ ul.rows li span:first-child,.yb .y{font-family:var(--serif);font-size:1.05rem;co
   <p class="kicker" id="popKicker"></p>
   <h2 id="popTitle"></h2>
   <div id="popBody"></div>
+</div>
+
+<figure class="cam" id="cam"><video id="camVideo" autoplay playsinline muted aria-label="Your camera, used for hand tracking"></video></figure>
+<div class="hand-cursor" id="handCursor" aria-hidden="true">
+  <svg viewBox="0 0 40 56" width="40" height="56">
+    <path class="bulb-glass" d="M20 3a15 15 0 0 0-9 27c2 1.6 3 3.6 3 6v3h12v-3c0-2.4 1-4.4 3-6a15 15 0 0 0-9-27z"/>
+    <path class="bulb-filament" d="M15.5 25l2.2-5 2.3 5 2.3-5 2.2 5M17.7 20v19M22.3 20v19"/>
+    <rect class="bulb-base" x="14" y="41" width="12" height="3.5" rx="1.5"/>
+    <rect class="bulb-base" x="15" y="46" width="10" height="3.5" rx="1.5"/>
+    <rect class="bulb-base" x="17.5" y="51" width="5" height="2.5" rx="1.2"/>
+  </svg>
 </div>
 
 <script>
@@ -225,11 +288,12 @@ S.forEach((s,i)=>{const b=document.createElement('button');b.style.setProperty('
 const navBtns=[...nav.children];
 
 let cur=-1;
-function regionAt(e){const r=brain.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+function regionAt(e){if(window.brain3d)return brain3d.regionAt(e.clientX,e.clientY); // 3D model, once loaded
+  const r=brain.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
   if(fx<0||fx>1||fy<0||fy>1)return -1;
   if(alphaReady){try{const a=hx.getImageData(Math.floor(fx*hit.width),Math.floor(fy*hit.height),1,1).data[3];if(a<30)return -1;}catch(_){}}
   return S.findIndex(s=>fy>=s.band[0]&&fy<s.band[1]);}
-function light(i){if(i===cur)return;cur=i;
+function light(i){if(i===cur)return;cur=i;window.brain3d?.setActive(i);
   glows.forEach((g,k)=>g.classList.toggle('on',k===i));navBtns.forEach((b,k)=>b.classList.toggle('on',k===i));
   brain.classList.toggle('active',i>-1);
   if(i>-1){const s=S[i];label.style.setProperty('--c',s.hex);label.querySelector('span').textContent=s.short;
@@ -239,7 +303,8 @@ function light(i){if(i===cur)return;cur=i;
   brain.style.cursor=i>-1?'pointer':'default';}
 brain.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')light(regionAt(e))});
 brain.addEventListener('pointerleave',()=>light(-1));
-brain.addEventListener('click',e=>{const i=regionAt(e);if(i>-1){light(i);openPop(i,null);}});
+brain.addEventListener('click',e=>{if(window.brain3d?.consumeDrag())return; // a drag-to-rotate isn't a click
+  const i=regionAt(e);if(i>-1){light(i);openPop(i,null);}});
 
 /* ---------- popup ---------- */
 const pop=document.getElementById('pop'),scrim=document.getElementById('scrim'),body=document.getElementById('popBody');let lastFocus=null;
@@ -256,6 +321,706 @@ function openPop(i,from){const s=S[i];lastFocus=from||document.activeElement;
 function closePop(){pop.classList.remove('open');scrim.classList.remove('open');light(-1);if(lastFocus&&lastFocus.focus)lastFocus.focus();}
 document.getElementById('close').addEventListener('click',closePop);scrim.addEventListener('click',closePop);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&pop.classList.contains('open'))closePop();});
+</script>
+
+<script type="module">
+/* ---------- 3D brain (three.js) ----------
+   Turns the brain artwork into a 3D model by "inflating" its outline: the further a point is from the edge,
+   the thicker the brain is there, and the two hemispheres are split along the middle. The artwork covers
+   the top and the underside. Drag to rotate; the hand-control script calls brain3d.handRotate() for an
+   open left palm. If WebGL or the library can't load, the flat image simply stays. */
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+const GRID = 256;                  // mesh resolution (cells across the image)
+const PICK_GRID = 96;              // lighter copy of the mesh used for hover/click hit-testing
+const TOP = 1.35, BOTTOM = 0.7;    // dome height above / below the outline, relative to its width
+const RELIEF = 0.5;                // how deep the artwork's dark grooves sink in
+const GAIN = 1.5;                  // hand turns are amplified so you can turn further than your wrist bends
+const EASE = 0.09;                 // seconds for the brain to glide to a new angle: higher = smoother, lower = snappier
+const REWIND = 4;                  // frames undone when the hand starts closing (~0.13 s)
+const PAD = 0.12;                  // must match the canvas inset in the CSS (-12%)
+const START = new THREE.Euler(0.35, -0.3, 0);   // starting tilt so the depth is visible
+
+const wrap = document.getElementById('brain');
+const art = document.getElementById('brainImg');
+const labelEl = document.getElementById('label');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+init().catch((err) => console.warn('3D brain unavailable, keeping the flat image.', err));
+
+async function init() {
+  await art.decode();
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });  // throws without WebGL
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  const canvas = renderer.domElement;
+  canvas.className = 'brain3d';
+  canvas.setAttribute('aria-hidden', 'true');
+
+  const scene = new THREE.Scene();
+  // Frame the camera so the unrotated brain lines up with the flat image
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+  camera.position.z = (1 + 2 * PAD) / Math.tan(THREE.MathUtils.degToRad(14));
+
+  const texture = new THREE.Texture(art);
+  texture.needsUpdate = true;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const hexToVec = (hex) => new THREE.Vector3(...[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255));
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      map: { value: texture },
+      uBands: { value: new THREE.Vector3(S[0].band[1], S[1].band[1], S[2].band[1]) },
+      uActive: { value: -1 },
+      uFade: { value: 0 },
+      uColor: { value: new THREE.Vector3(1, 1, 1) }
+    },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vNormal; varying vec3 vView;
+      void main() {
+        vUv = uv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vView = -mv.xyz;
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    // Same look as the flat version: normal, dimmed, and the highlighted region tinted in its color
+    fragmentShader: `
+      uniform sampler2D map; uniform vec3 uBands; uniform float uActive; uniform float uFade; uniform vec3 uColor;
+      varying vec2 vUv; varying vec3 vNormal; varying vec3 vView;
+      float bandOf(float y) { return y < uBands.x ? 0.0 : y < uBands.y ? 1.0 : y < uBands.z ? 2.0 : 3.0; }
+      void main() {
+        vec3 c = texture2D(map, vUv).rgb;
+        float g = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        vec3 base = mix(vec3(g), c, 0.75) * 0.82;
+        vec3 dim = mix(vec3(g), c, 0.5) * 0.55;
+        vec3 lit = vec3(clamp((g * 1.7 - 0.5) * 1.15 + 0.5, 0.0, 1.0)) * uColor;
+        bool inBand = abs(bandOf(1.0 - vUv.y) - uActive) < 0.5;
+        vec3 col = mix(base, inBand ? lit : dim, uFade);
+        vec3 N = normalize(vNormal), V = normalize(vView);
+        float diffuse = max(dot(N, normalize(vec3(-0.35, 0.55, 0.75))), 0.0);
+        float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+        vec3 rimColor = inBand ? mix(vec3(0.35, 0.33, 0.5), uColor, uFade) : vec3(0.35, 0.33, 0.5);
+        gl_FragColor = vec4(col * (0.42 + 0.78 * diffuse) + rim * rimColor * 0.5, 1.0);
+      }`
+  });
+
+  const { geometry, centers } = buildBrain(GRID, true);
+  const mesh = new THREE.Mesh(geometry, material);
+  const pickMesh = new THREE.Mesh(buildBrain(PICK_GRID, false).geometry, new THREE.MeshBasicMaterial());
+  pickMesh.visible = false;   // never drawn, only hit-tested
+
+  // Rotate around the middle of the brain
+  const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+  const pivot = new THREE.Group();
+  pivot.position.copy(center);
+  mesh.position.copy(center).negate();
+  pickMesh.position.copy(mesh.position);
+  pivot.add(mesh, pickMesh);
+  scene.add(pivot);
+
+  wrap.insertBefore(canvas, art.nextSibling);
+  wrap.classList.add('is3d');
+  wrap.setAttribute('aria-label', 'Interactive 3D brain. Drag to rotate, hover a region to preview a section, click to open it.');
+  const resize = () => {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  };
+  new ResizeObserver(resize).observe(wrap);
+  resize();
+
+  /* ----- orientation -----
+     rest  = where the user is turning it to (drag / hand)
+     shown = what's on screen; glides toward rest every display frame, so motion stays smooth
+             even though the camera only updates ~30 times a second
+     sway  = gentle idle motion layered on top */
+  const rest = new THREE.Quaternion().setFromEuler(START);
+  const shown = rest.clone();
+  const sway = new THREE.Quaternion(), euler = new THREE.Euler();
+  let swayAmp = 0, interacting = 0, lastTouch = -1e9;
+  const begin = () => {
+    if (swayAmp > 1e-3) { rest.multiply(sway); shown.multiply(sway); }   // keep the current sway pose
+    swayAmp = 0;
+    interacting++;
+  };
+  const end = () => { interacting = Math.max(0, interacting - 1); lastTouch = performance.now(); };
+  const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion();
+  const turn = (axis, angle) => rest.premultiply(tmpQ.setFromAxisAngle(axis, angle));
+
+  // Mouse / touch drag
+  let drag = null, dragged = false;
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.button === 0) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+  });
+  addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 6) return;   // small jitters still count as a click
+      drag.moved = true;
+      begin();
+    }
+    drag.x = e.clientX; drag.y = e.clientY;
+    turn(Y, dx * 0.01);
+    turn(X, dy * 0.01);
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (drag.moved) { dragged = true; setTimeout(() => (dragged = false), 0); end(); }
+    drag = null;
+  };
+  addEventListener('pointerup', endDrag);
+  addEventListener('pointercancel', endDrag);
+
+  // Open-palm hand turning: the brain copies how your hand rotates since the palm opened
+  let grab = null;
+  const fromMP = (p) => new THREE.Vector3(-p.x, -p.y, p.z);   // MediaPipe axes → screen axes (x right, y up, z toward you)
+  function handOrientation(w) {
+    const wrist = fromMP(w[0]);
+    const up = fromMP(w[9]).sub(wrist).normalize();                 // wrist → middle knuckle
+    const across = fromMP(w[17]).sub(fromMP(w[5]));                  // index knuckle → pinky knuckle
+    const normal = new THREE.Vector3().crossVectors(across, up).normalize();
+    const side = new THREE.Vector3().crossVectors(up, normal);
+    return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, normal));
+  }
+  function amplify(q, gain) {
+    if (q.w < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+    const angle = 2 * Math.acos(Math.min(1, q.w));
+    if (angle < 1e-4) return q;
+    const s = Math.sin(angle / 2);
+    return q.setFromAxisAngle(new THREE.Vector3(q.x / s, q.y / s, q.z / s), angle * gain);
+  }
+  // steady = false while the fingers are bending (e.g. the hand is closing): the brain freezes,
+  // undoing the last few frames so the start of the closing motion doesn't drag it along
+  const recent = [];   // last few orientations while turning
+  function handRotate(world, steady = true) {
+    if (!world) { if (grab) { grab = null; end(); } return; }
+    const q = handOrientation(world);
+    if (!grab) {
+      begin();
+      grab = { ref: q.clone(), smooth: q.clone(), start: rest.clone(), held: false };
+      recent.length = 0;
+      return;
+    }
+    if (!steady) {
+      if (!grab.held && recent.length) rest.copy(recent[0]);
+      grab.held = true;
+      return;
+    }
+    grab.held = false;
+    // Adaptive smoothing: a still hand gets heavy smoothing (no jitter), a fast turn stays responsive
+    grab.smooth.slerp(q, Math.min(0.6, 0.1 + grab.smooth.angleTo(q) * 3));
+    const delta = amplify(grab.smooth.clone().multiply(grab.ref.clone().invert()), GAIN);
+    rest.multiplyQuaternions(delta, grab.start);
+    recent.push(rest.clone());
+    if (recent.length > REWIND) recent.shift();
+  }
+
+  /* ----- hit-testing and highlighting ----- */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function regionAt(x, y) {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    if (Math.abs(ndc.x) > 1 || Math.abs(ndc.y) > 1) return -1;
+    pivot.updateMatrixWorld(true);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(pickMesh, false)[0];
+    if (!hit) return -1;
+    const iy = 1 - hit.uv.y;   // image y, 0 = top
+    return S.findIndex((s) => iy >= s.band[0] && iy < s.band[1]);
+  }
+  let active = -1;
+  function setActive(i) {
+    active = i;
+    if (i > -1) {
+      material.uniforms.uActive.value = i;
+      material.uniforms.uColor.value.copy(hexToVec(S[i].hex));
+    }
+  }
+  // Keep the region label over its part of the brain as it turns
+  const p = new THREE.Vector3();
+  function placeLabel(i) {
+    p.copy(centers[i]).applyMatrix4(mesh.matrixWorld).project(camera);
+    labelEl.style.left = (((p.x + 1) / 2) * (1 + 2 * PAD) - PAD) * 100 + '%';
+    labelEl.style.top = (((1 - p.y) / 2) * (1 + 2 * PAD) - PAD) * 100 + '%';
+  }
+
+  let lastFrame = null;
+  function frame(t) {
+    const dt = lastFrame === null ? 0 : Math.min(0.1, (t - lastFrame) / 1000);
+    lastFrame = t;
+    shown.slerp(rest, 1 - Math.exp(-dt / EASE));   // same feel at 60 Hz or 120 Hz
+    const idle = !reduceMotion && interacting === 0 && performance.now() - lastTouch > 4000;
+    swayAmp += ((idle ? 1 : 0) - swayAmp) * 0.01;
+    sway.setFromEuler(euler.set(Math.sin(t * 0.0004) * 0.12 * swayAmp, Math.sin(t * 0.00027) * 0.5 * swayAmp, 0));
+    pivot.quaternion.multiplyQuaternions(shown, sway);
+    const u = material.uniforms;
+    u.uFade.value += ((active > -1 ? 1 : 0) - u.uFade.value) * 0.15;
+    pivot.updateMatrixWorld(true);
+    if (active > -1) placeLabel(active);
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  window.brain3d = {
+    regionAt, setActive, handRotate,
+    consumeDrag: () => { const d = dragged; dragged = false; return d; }
+  };
+  if (typeof cur !== 'undefined' && cur > -1) setActive(cur);   // in case a region was lit while loading
+}
+
+/* Build the mesh from the artwork's outline (alpha channel) */
+function buildBrain(N, withRelief) {
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(art, 0, 0, N, N);
+  const px = ctx.getImageData(0, 0, N, N).data;
+  const alpha = new Float32Array(N * N), inside = new Uint8Array(N * N), lum = new Float32Array(N * N);
+  for (let k = 0; k < N * N; k++) {
+    alpha[k] = px[k * 4 + 3];
+    inside[k] = alpha[k] > 127 ? 1 : 0;
+    lum[k] = (0.2126 * px[k * 4] + 0.7152 * px[k * 4 + 1] + 0.0722 * px[k * 4 + 2]) / 255;
+  }
+  splitHemispheres(inside, alpha, N);
+  const dist = distanceToEdge(inside, N);
+  const groove = withRelief ? smoothInside(lum, inside, N, 3) : null;   // wider blur = smoother surface
+
+  let maxD = 1, lumSum = 0, count = 0;
+  for (let k = 0; k < N * N; k++) if (inside[k]) {
+    maxD = Math.max(maxD, dist[k]);
+    if (groove) { lumSum += groove[k]; count++; }
+  }
+  const R = Math.max(1, maxD - 1), meanLum = count ? lumSum / count : 0, s = 2 / N;
+
+  const isEdge = (gx, gy) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = gx + dx, y = gy + dy;
+      if (x < 0 || y < 0 || x >= N || y >= N || !inside[y * N + x]) return true;
+    }
+    return false;
+  };
+
+  // Vertices: one on top and one underneath per pixel; outline pixels are shared so the surface is closed
+  const pos = [], uvs = [], front = new Int32Array(N * N).fill(-1), back = new Int32Array(N * N).fill(-1), edges = [];
+  const add = (x, y, z, u, v) => { pos.push(x, y, z); uvs.push(u, v); return pos.length / 3 - 1; };
+  for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+    const k = gy * N + gx;
+    if (!inside[k]) continue;
+    const x = (gx + 0.5) * s - 1, y = 1 - (gy + 0.5) * s, u = (gx + 0.5) / N, v = 1 - (gy + 0.5) / N;
+    if (isEdge(gx, gy)) { front[k] = back[k] = add(x, y, 0, u, v); edges.push(k); continue; }
+    const t = Math.min((dist[k] - 1) / R, 1), dome = Math.sqrt(1 - (1 - t) * (1 - t));   // rounded profile
+    const dip = groove ? RELIEF * R * (groove[k] - meanLum) * Math.min(1, t * 4) : 0;
+    front[k] = add(x, y, (TOP * R * dome + dip) * s, u, v);
+    back[k] = add(x, y, -BOTTOM * R * dome * s, u, v);
+  }
+
+  // Smooth the outline so it isn't stair-stepped
+  for (let it = 0; it < 3; it++) {
+    const next = edges.map((k) => {
+      const gx = k % N, gy = (k / N) | 0;
+      let sx = 0, sy = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const x = gx + dx, y = gy + dy, j = y * N + x;
+        if (x < 0 || y < 0 || x >= N || y >= N || !inside[j] || front[j] !== back[j]) continue;
+        sx += pos[front[j] * 3]; sy += pos[front[j] * 3 + 1]; n++;
+      }
+      const i = front[k] * 3;
+      return [(pos[i] + sx / n) / 2, (pos[i + 1] + sy / n) / 2];
+    });
+    edges.forEach((k, e) => { pos[front[k] * 3] = next[e][0]; pos[front[k] * 3 + 1] = next[e][1]; });
+  }
+
+  // Triangles (top faces toward the viewer, underside faces away); cells with 3 corners inside get one triangle
+  const index = [];
+  const tri = (a, b, c) => { index.push(front[a], front[b], front[c], back[a], back[c], back[b]); };
+  for (let gy = 0; gy < N - 1; gy++) for (let gx = 0; gx < N - 1; gx++) {
+    const a = gy * N + gx, b = a + 1, c = a + N, d = c + 1;
+    const n = inside[a] + inside[b] + inside[c] + inside[d];
+    if (n === 4) { tri(a, c, d); tri(a, d, b); }
+    else if (n === 3) {
+      if (!inside[d]) tri(a, c, b);
+      else if (!inside[b]) tri(a, c, d);
+      else if (!inside[a]) tri(c, d, b);
+      else tri(a, d, b);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+
+  // Middle of each region (for label placement)
+  const sums = S.map(() => [0, 0, 0, 0]);
+  for (let i = 0; i < pos.length / 3; i++) {
+    const iy = 1 - uvs[i * 2 + 1];
+    const b = S.findIndex((r) => iy >= r.band[0] && iy < r.band[1]);
+    if (b < 0) continue;
+    sums[b][0] += pos[i * 3]; sums[b][1] += pos[i * 3 + 1]; sums[b][2] += pos[i * 3 + 2]; sums[b][3]++;
+  }
+  const centers = sums.map(([x, y, z, n]) => new THREE.Vector3(x / (n || 1), y / (n || 1), z / (n || 1)));
+  return { geometry, centers };
+}
+
+// Cut along the gap between the hemispheres (lowest-alpha path near the middle) so each gets its own dome
+function splitHemispheres(inside, alpha, N) {
+  let minX = N, maxX = -1;
+  for (let k = 0; k < N * N; k++) if (inside[k]) { const x = k % N; minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+  if (maxX < 0) return;
+  const mid = Math.round((minX + maxX) / 2), span = Math.max(2, Math.round(N * 0.04));
+  let best = mid, bestSum = Infinity;
+  for (let x = mid - span; x <= mid + span; x++) {
+    let sum = 0;
+    for (let y = 0; y < N; y++) sum += alpha[y * N + x];
+    if (sum < bestSum) { bestSum = sum; best = x; }
+  }
+  const wiggle = Math.max(1, Math.round(N / 80));
+  for (let y = 0; y < N; y++) {
+    let bx = best, ba = Infinity;
+    for (let x = best - wiggle; x <= best + wiggle; x++) if (alpha[y * N + x] < ba) { ba = alpha[y * N + x]; bx = x; }
+    inside[y * N + bx] = 0;
+  }
+}
+
+// Exact Euclidean distance from each inside pixel to the nearest outside pixel (Felzenszwalb & Huttenlocher)
+function distanceToEdge(inside, N) {
+  const INF = 1e12, grid = new Float64Array(N * N);
+  for (let k = 0; k < N * N; k++) grid[k] = inside[k] ? INF : 0;
+  const f = new Float64Array(N), d = new Float64Array(N), v = new Int32Array(N), z = new Float64Array(N + 1);
+  const pass = (n) => {
+    let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+    for (let q = 1; q < n; q++) {
+      let s;
+      while ((s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k])) <= z[k]) k--;
+      k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+  };
+  for (let x = 0; x < N; x++) {
+    for (let y = 0; y < N; y++) f[y] = grid[y * N + x];
+    pass(N);
+    for (let y = 0; y < N; y++) grid[y * N + x] = d[y];
+  }
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) f[x] = grid[y * N + x];
+    pass(N);
+    for (let x = 0; x < N; x++) grid[y * N + x] = Math.sqrt(d[x]);
+  }
+  return grid;
+}
+
+// Box blur that only averages pixels inside the brain (so the background doesn't bleed in)
+function smoothInside(values, inside, N, r) {
+  const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    if (!inside[y * N + x]) continue;
+    let sum = 0, n = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= N || yy >= N || !inside[yy * N + xx]) continue;
+      sum += values[yy * N + xx]; n++;
+    }
+    out[y * N + x] = sum / n;
+  }
+  return out;
+}
+</script>
+
+<script type="module">
+/* ---------- hand control (MediaPipe Hand Landmarker) ----------
+   The camera stays off until the visitor clicks "Hand control".
+   Video is processed in the browser and never uploaded anywhere.
+   Left index finger steers the lightbulb cursor; an open left palm turns the 3D brain with your wrist;
+   pinch right thumb + index finger to click. */
+const MP_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0';
+const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
+const CURSOR_EASE = 0.09;                 // seconds for the cursor to catch up: higher = steadier, lower = snappier
+const SPAN = 2.5;                         // control box width in hand-sizes: lower = more sensitive
+const PINCH_ON = 0.30, PINCH_OFF = 0.45;  // thumb–index gap relative to hand size (gap between them avoids flicker)
+
+const btn = document.getElementById('handBtn'), statusEl = document.getElementById('handStatus');
+const cam = document.getElementById('cam'), video = document.getElementById('camVideo');
+const cursor = document.getElementById('handCursor');
+const help = document.getElementById('handHelp');
+
+let landmarker = null, stream = null, running = false, rafId = 0, lastVideoTime = -1;
+let pos = null;        // smoothed cursor position in viewport pixels, null when no hand is visible
+let box = null;        // control box around the hand (camera pixels): moving within it covers the whole screen
+let handSize = 0;      // smoothed hand size in camera pixels
+const last = { fx: 0.5, fy: 0.5 };  // last cursor position as a fraction of the screen
+let pinching = false;
+
+const say = (msg) => { statusEl.textContent = msg; };
+const HINT = 'Left: point to move, open palm to turn · Right: pinch to click';
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const popOpen = () => pop.classList.contains('open');
+
+// Load the library and model only when hand control is first turned on
+async function loadLandmarker() {
+  const { FilesetResolver, HandLandmarker } = await import(`${MP_URL}/vision_bundle.mjs`);
+  const vision = await FilesetResolver.forVisionTasks(`${MP_URL}/wasm`);
+  const options = (delegate) => ({
+    baseOptions: { modelAssetPath: MODEL_URL, delegate },
+    runningMode: 'VIDEO',
+    numHands: 2
+  });
+  try {
+    return await HandLandmarker.createFromOptions(vision, options('GPU'));
+  } catch {
+    return await HandLandmarker.createFromOptions(vision, options('CPU'));  // fallback if WebGL is unavailable
+  }
+}
+
+async function start() {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    say('Camera needs https or localhost');
+    return;
+  }
+  btn.disabled = true;
+  try {
+    say('Starting camera…');
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+    cam.classList.add('on');
+    if (!landmarker) {
+      say('Loading hand tracking…');
+      landmarker = await loadLandmarker();
+    }
+  } catch (err) {
+    console.error(err);
+    stop();
+    say(err.name === 'NotAllowedError' ? 'Camera permission denied'
+      : err.name === 'NotReadableError' ? 'Camera is in use by another app'
+      : 'Hand control unavailable');
+    btn.disabled = false;
+    return;
+  }
+  running = true;
+  btn.disabled = false;
+  btn.setAttribute('aria-pressed', 'true');
+  btn.textContent = 'Stop hand control';
+  help.hidden = false;
+  say(HINT);
+  rafId = requestAnimationFrame(track);
+}
+
+function stop() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  if (stream) stream.getTracks().forEach((t) => t.stop());  // turns the camera light off
+  stream = null;
+  video.srcObject = null;
+  cam.classList.remove('on');
+  hideCursor();
+  releasePinch();
+  window.brain3d?.handRotate(null);
+  palmScore = 0;
+  palmMode = false;
+  lastLeftWrist = null;
+  btn.setAttribute('aria-pressed', 'false');
+  btn.textContent = 'Hand control';
+  help.open = false;
+  help.hidden = true;
+  say('');
+}
+
+function track(t) {
+  if (!running) return;
+  glideCursor(t);
+  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {  // only process new frames
+    lastVideoTime = video.currentTime;
+    const result = landmarker.detectForVideo(video, performance.now());
+    const { left, leftWorld, right } = splitHands(result);
+    if (left) { leftGone = 0; lastLeftWrist = left[0]; }
+    else if (++leftGone > FORGET_FRAMES) lastLeftWrist = null;
+
+    if (left && leftWorld && window.brain3d && palmOpen(leftWorld)) {
+      hideCursor();                             // open left palm: turn the brain
+      brain3d.handRotate(leftWorld, palmSteady); // freezes while the fingers are bending (closing)
+    } else if (!left && palmMode && leftGone <= GRACE_FRAMES) {
+      // Tracking blinked out mid-turn (fast motion, hand edge-on): hold the turn and pick it back up
+    } else {
+      window.brain3d?.handRotate(null);
+      if (!left) resetPalm();
+      left ? moveCursor(left) : hideCursor();   // otherwise the left hand steers the cursor
+    }
+    right ? checkPinch(right) : releasePinch(); // right hand clicks
+    if (pos) hover(pos.x, pos.y);
+  }
+  rafId = requestAnimationFrame(track);
+}
+
+// Work out which detected hand is your left and which is your right.
+// MediaPipe labels hands as if the image were mirrored (selfie view). Our webcam feed isn't,
+// so its labels come out swapped. When both hands are visible we check by position and fix this automatically.
+let swapLabels = true;
+function splitHands(result) {
+  const hands = (result.landmarks || []).map((lm, i) => ({
+    lm, world: result.worldLandmarks?.[i], label: result.handedness?.[i]?.[0]?.categoryName
+  }));
+  let left = null, right = null;
+  if (hands.length >= 2) {
+    // In the raw (unmirrored) frame your left hand appears on the right side, i.e. larger x
+    const [a, b] = hands;
+    [left, right] = a.lm[0].x > b.lm[0].x ? [a, b] : [b, a];
+    if (left.label && right.label && left.label !== right.label) swapLabels = left.label === 'Right';
+  } else if (hands.length === 1) {
+    const h = hands[0];
+    let isLeft = (h.label === 'Left') !== swapLabels;
+    // MediaPipe often flips the label when the back of the hand turns toward the camera.
+    // If this hand is where the left hand just was, it's still the left hand.
+    if (lastLeftWrist && Math.hypot(h.lm[0].x - lastLeftWrist.x, h.lm[0].y - lastLeftWrist.y) < 0.12) isLeft = true;
+    if (isLeft) left = h; else right = h;
+  }
+  return { left: left?.lm, leftWorld: left?.world, right: right?.lm };
+}
+let lastLeftWrist = null, leftGone = 0;
+const GRACE_FRAMES = 12;     // ~0.4 s: keep turning through brief tracking dropouts
+const FORGET_FRAMES = 15;    // after ~0.5 s without the left hand, stop assuming where it is
+
+// Open palm = all five fingers straight. Uses 3D hand coordinates (meters), so it works at any angle.
+// Starting is strict (all five clearly out, 3 frames in a row); stopping needs 2+ fingers clearly
+// curled for 5 frames in a row. That way turning the wrist edge-on to the camera doesn't drop out.
+let palmScore = 0, palmMode = false, palmSteady = false;
+function palmOpen(w) {
+  const d = (a, b) => Math.hypot(w[a].x - w[b].x, w[a].y - w[b].y, w[a].z - w[b].z);
+  const ratios = [[8, 6], [12, 10], [16, 14], [20, 18]]          // [fingertip, middle joint]
+    .map(([tip, joint]) => d(0, tip) / d(0, joint));
+  const thumbOut = d(4, 9) > d(2, 9) * 0.9 && d(0, 4) > d(0, 3);  // thumb straight, not tucked across the palm
+  const open = thumbOut && ratios.every((r) => r > 1.2);
+  const closed = ratios.filter((r) => r < 1.05).length >= 2;     // e.g. a fist or pointing
+  palmSteady = ratios.every((r) => r > 1.15);                    // fingers still straight this frame
+  // (once they start bending the brain stops following, so closing your hand doesn't drag it along)
+  if (!palmMode) {
+    palmScore = open ? palmScore + 1 : 0;
+    if (palmScore >= 3) { palmMode = true; palmScore = 0; say('Turning the brain. Close your hand to stop'); }
+  } else {
+    palmScore = closed ? palmScore + 1 : 0;
+    if (palmScore >= 5) { palmMode = false; palmScore = 0; say(HINT); }
+  }
+  return palmMode;
+}
+function resetPalm() {
+  if (palmMode) say(HINT);
+  palmScore = 0;
+  palmMode = false;
+}
+
+function moveCursor(lm) {
+  // Work in camera pixels, mirrored so moving your hand right moves the cursor right
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  const P = (p) => ({ x: (1 - p.x) * vw, y: p.y * vh });
+
+  // Hand size (wrist 0 → middle knuckle 9), smoothed so the box doesn't wobble.
+  // It shrinks/grows as you move away/closer, so sensitivity stays the same at any distance.
+  const size = Math.hypot(P(lm[0]).x - P(lm[9]).x, P(lm[0]).y - P(lm[9]).y);
+  handSize = handSize ? handSize + (size - handSize) * 0.1 : size;
+
+  // Control box: SPAN hand-sizes wide, same shape as the screen
+  const bw = handSize * SPAN, bh = bw * innerHeight / innerWidth;
+
+  // Cursor follows the index fingertip (8)
+  const hx = P(lm[8]).x, hy = P(lm[8]).y;
+
+  // When the hand appears, place the box so the cursor continues from where it was
+  if (!box) box = { cx: hx - (last.fx - 0.5) * bw, cy: hy - (last.fy - 0.5) * bh };
+
+  // If the hand leaves the box, drag the box along so you never get stuck at an edge
+  const halfW = bw / 2, halfH = bh / 2;
+  if (hx < box.cx - halfW) box.cx = hx + halfW; else if (hx > box.cx + halfW) box.cx = hx - halfW;
+  if (hy < box.cy - halfH) box.cy = hy + halfH; else if (hy > box.cy + halfH) box.cy = hy - halfH;
+
+  last.fx = clamp01((hx - box.cx) / bw + 0.5);
+  last.fy = clamp01((hy - box.cy) / bh + 0.5);
+  aim = { x: last.fx * innerWidth, y: last.fy * innerHeight };
+  if (!pos) {
+    pos = { ...aim };
+    cursor.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+  }
+  cursor.classList.add('on');
+}
+
+// The camera updates ~30 times a second; gliding toward the latest position on every
+// display frame keeps the lightbulb moving smoothly in between
+let aim = null, lastGlide = null;
+function glideCursor(t) {
+  const dt = lastGlide === null ? 0 : Math.min(0.1, Math.max(0, (t - lastGlide) / 1000));
+  lastGlide = t;
+  if (!pos || !aim) return;
+  const k = 1 - Math.exp(-dt / CURSOR_EASE);
+  pos.x += (aim.x - pos.x) * k;
+  pos.y += (aim.y - pos.y) * k;
+  cursor.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+}
+
+function hideCursor() {
+  if (!pos) return;
+  pos = null;
+  aim = null;
+  box = null;        // re-anchor the control box around the hand when it comes back
+  handSize = 0;
+  cursor.classList.remove('on');
+  if (!popOpen()) light(-1);
+}
+
+// Right hand: pinch = thumb and index tips close together, relative to hand size (wrist 0 → middle knuckle 9)
+function checkPinch(lm) {
+  const gap = dist(lm[4], lm[8]) / (dist(lm[0], lm[9]) || 1);
+  if (!pinching && gap < PINCH_ON) {
+    pinching = true;
+    cursor.classList.add('pinch');      // bulb lights up
+    if (pos) select(pos.x, pos.y);      // click where the left hand is pointing
+  } else if (pinching && gap > PINCH_OFF) {
+    releasePinch();
+  }
+}
+
+function releasePinch() {
+  pinching = false;
+  cursor.classList.remove('pinch');
+}
+
+// Highlight the brain region or section button under the cursor; scroll an open popup near its edges
+function hover(x, y) {
+  if (popOpen()) {
+    const r = pop.getBoundingClientRect(), edge = r.height * 0.15;
+    if (x >= r.left && x <= r.right) {
+      if (y > r.bottom - edge && y < r.bottom + 40) pop.scrollTop += 8;
+      else if (y < r.top + edge && y > r.top - 40) pop.scrollTop -= 8;
+    }
+    return;
+  }
+  let i = regionAt({ clientX: x, clientY: y });
+  if (i < 0) {
+    const b = document.elementFromPoint(x, y)?.closest('#nav button');
+    if (b) i = navBtns.indexOf(b);
+  }
+  light(i);
+}
+
+// Pinch acts like a click at the cursor
+function select(x, y) {
+  if (!popOpen()) {
+    const i = regionAt({ clientX: x, clientY: y });
+    if (i > -1) { light(i); openPop(i, null); return; }
+  }
+  const el = document.elementFromPoint(x, y);
+  const target = el && el.closest('button, a, summary, #scrim');
+  if (target) target.click();
+}
+
+btn.addEventListener('click', () => (running ? stop() : start()));
 </script>
 </body>
 </html>
